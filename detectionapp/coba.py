@@ -389,7 +389,7 @@ async def process_url(url, model, word2vec_model, device):
         return {"error": f"Processing error for {url}: {str(e)}", "url": url}
 
 
-async def analyze_websites(query=None, num_results=5):
+async def analyze_websites(query=None, num_results=5, domain=None):
     """Main function to analyze websites for gambling content"""
     # Define device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -404,13 +404,11 @@ async def analyze_websites(query=None, num_results=5):
     if not model or not word2vec_model:
         return {"error": "Failed to load models. Please check model paths and files."}
     
-    # Get URLs either from parameters or search
-    # if not urls:
     if query:
         urls = get_search_results(query, num_results)
-    #     else:
-    #         return {"error": "No URLs or search query provided"}
-    
+    else:
+        urls = domain
+
     if not urls:
         return {"error": "No URLs found to analyze"}
     
@@ -418,20 +416,14 @@ async def analyze_websites(query=None, num_results=5):
     tasks = [process_url(url, model, word2vec_model, device) for url in urls]
     results = await asyncio.gather(*tasks)
     
-    return results # Return the first result for simplicity
+    # Always return a list of results, even if only one
+    return list(results)
 
-
-# Django integration function
-async def analyze_for_django(query=None, num_results=5):
-
-    """Function to be called from Django views"""
-    history_entry = await models.history.objects.acreate(type='kata kunci')
-    results = await analyze_websites(query, num_results)
-    from asgiref.sync import sync_to_async
+async def save_model(results, type):
+    history_entry = await models.history.objects.acreate(type=type)
     for res in results:
         if 'error' in res:
-            # Log error in the database
-            await sync_to_async(models.result.objects.create)(
+            await models.result.objects.acreate(
                 img=None,
                 text=res['error'],
                 primary_factor=None,
@@ -444,8 +436,7 @@ async def analyze_for_django(query=None, num_results=5):
                 history_id=history_entry
             )
         else:
-            # Save result to database
-            await sync_to_async(models.result.objects.create)(
+            await models.result.objects.acreate(
                 img=res['screenshot_path'],
                 text=res['extracted_text'],
                 primary_factor=res['primary_factor'],
@@ -458,6 +449,56 @@ async def analyze_for_django(query=None, num_results=5):
                 history_id=history_entry
             )
     return history_entry.id  # Return the history entry ID
+
+
+async def image_upload(file):
+    """Function to be called from Django views"""
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # Load models
+    model_path = ASSETS_DIR + 'best_gambling_detector_model.pth'
+    word2vec_path = ASSETS_DIR + 'word2vec_model.bin'
+    
+    model = await load_model(model_path, device)
+    word2vec_model = await load_word2vec_model(word2vec_path)
+    
+    if not model or not word2vec_model:
+        return {"error": "Failed to load models. Please check model paths and files."}
+    
+    from django.core.files.storage import FileSystemStorage
+
+    fs = FileSystemStorage(location='media/images/')
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = fs.save('uploaded_'+timestamp+'.png', file)
+    file_path = fs.path(filename) 
+    image = Image.open(file_path).save(file_path)
+    
+    # Perform OCR
+    image = Image.open(file_path)
+    image = image.convert('L')  # Convert to grayscale
+    extracted_text = pytesseract.image_to_string(image, lang="ind")
+    
+    # Pre-process text
+    cleaned_text = re.sub(r'[^\w\s.,]', '', extracted_text).lower()  # Keep only alphanumeric, spaces, periods, commas
+    cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
+    filtered_text = ' '.join([word for word in cleaned_text.split() if word not in sastrawi_stopwords])
+    filtered_text = stemmer.stem(filtered_text)  # Apply stemming
+    
+    # Make prediction
+    prediction = await predict_single_website(model, word2vec_model, file_path, filtered_text, device)
+    prediction['screenshot_path'] = filename  # Add the screenshot path
+    prediction['extracted_text'] = filtered_text[:500]  # Add a preview of the text
+    prediction['url'] = "image uploaded"  # Add the URL to the prediction result
+    
+    return await save_model([prediction], 'upload')  # Save the result to the database and return the history entry ID
+
+async def main_domain(domain):
+    results = await analyze_websites(domain=domain)
+    return await save_model(results, 'domain')  # Return the history entry ID
+
+async def main_search(query, num_results): 
+    results = await analyze_websites(query=query, num_results=num_results)
+    return await save_model(results, 'search')  # Return the history entry ID
 
 # For standalone testing
 if __name__ == "__main__":

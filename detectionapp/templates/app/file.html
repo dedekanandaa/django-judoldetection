@@ -9,8 +9,9 @@
         {% include 'components/input_type.html' %}
     </div>
 </div>
-<form class="flex gap-2" action="">
-    <input type="file" name="name" id="name" required
+<form class="flex gap-2" method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="file" name="image" id="image" required
         class="block w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white" />
     <button class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-3.5 text-center hover:cursor-pointer dark:bg-gray-800 dark:border-gray-700 border dark:hover:bg-blue-700 dark:focus:ring-blue-800" type="submit">
         <svg class="w-3.5 h-3.5 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">

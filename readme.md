@@ -28,7 +28,11 @@ Repositori ini berisi aplikasi skripsi. Ikuti langkah berikut untuk menjalankan 
     ```bash
     python manage.py migrate
     ```
-3. Load Model:
+3. Buat user:
+    ```bash
+    python manage.py createsuperuser
+    ```
+4. Load Model:
     
     Download model di [Prasyarat](#prasyarat) dan simpan semua model pada ```media/assets/```.
 

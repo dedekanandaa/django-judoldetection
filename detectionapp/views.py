@@ -59,7 +59,7 @@ def search_view(request):
 
         from . import coba
         import asyncio
-        result = asyncio.run(coba.analyze_for_django(query=query, num_results=limit))
+        result = asyncio.run(coba.main_search(query=query, num_results=limit))
 
         return redirect('detect:result', id=result)
     else:     
@@ -67,36 +67,30 @@ def search_view(request):
 
 @login_required
 def file_view(request):
-    return render(request, 'app/file.html', {"input_type": "Import Gambar"})
+    if request.method == 'POST':
+        file = request.FILES.get('image')
+        if not file:
+            messages.error(request, 'File tidak boleh kosong')
+            return redirect('detect:file')
+
+        from . import coba
+        import asyncio
+        result = asyncio.run(coba.image_upload(file=file))
+
+        return redirect('detect:result', id=result)
+    else:
+        return render(request, 'app/file.html', {"input_type": "Import Gambar"})
 
 @login_required
 def domain_view(request):
     if request.method == 'POST':
-        return redirect('detect:history')
-        # query = request.POST.get('query')
-        # limit = int(request.POST.get('limit'))
-        # if not query:
-        #     messages.error(request, 'Kata kunci tidak boleh kosong')
-        #     return redirect('detect:search')
-        # if not limit:
-        #     messages.error(request, 'Limit tidak boleh kosong')
-        #     return redirect('detect:search')
-        # if len(query) < 3:
-        #     messages.error(request, 'Kata kunci terlalu pendek')
-        #     return redirect('detect:search')
-        # if len(query) > 100:
-        #     messages.error(request, 'Kata kunci terlalu panjang')
-        #     return redirect('detect:search')
-        # if limit > 20:
-        #     limit = 20
-        # if limit < 1:
-        #     limit = 1
+        domain = request.POST.getlist('domain')
 
-        # from . import coba
-        # import asyncio
-        # result = asyncio.run(coba.analyze_for_django(query=query, num_results=limit))
+        from . import coba
+        import asyncio
+        result = asyncio.run(coba.main_domain(domain=domain))
 
-        # return redirect('detect:result', id=result)
+        return redirect('detect:result', id=result)
     else: 
         limit = int(request.GET.get('limit', 5))
         if limit < 1:
