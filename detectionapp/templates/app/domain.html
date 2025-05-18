@@ -1,0 +1,23 @@
+{% extends "index.html" %}
+
+{% block title %}Cari Situs{% endblock title %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+    <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Masukkan Domain</h1>
+    <div class="flex gap-3">
+        {% include 'components/limit.html' %}
+        {% include 'components/input_type.html' %}
+    </div>
+</div>
+<form action="">
+    {% for i in limit %}
+    <input type="text" name="name" id="name" placeholder="Domain {{i}} (example.co.id)" required
+        class="block w-full p-2 mt-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white" />
+    {% endfor %}
+    <button class="block w-full p-2 mt-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-blue-600 dark:border-gray-700 dark:text-white hover:dark:bg-blue-700 hover:cursor-pointer" type="submit">
+        Submit
+    </button>
+</form>
+<span class="text-gray dark:text-gray-500">Sistem akan mendeteksi situs berdasarkan domain yang dituliskan.</span>
+{% endblock %}

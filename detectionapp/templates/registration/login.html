@@ -1,0 +1,38 @@
+{% extends "index.html" %}
+
+{% block title %}login{% endblock title %}
+
+{% block content %}
+
+<div class="max-w-md mx-auto bg-white px-6 py-10 rounded-lg shadow-md dark:bg-gray-800">
+    <div class="mb-4 text-center dark:text-white space-y-2">
+        <h1 class="text-3xl font-bold text-gray-800 dark:text-white">LOGIN</h1>
+        <span>Silahkan login terlebih dahulu</span>
+    </div>
+    {% if messages %}
+    {% for message in messages %}
+    <div class="mb-4 text-red-500 text-center dark:text-red-400">
+        {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
+    
+    <form method="POST" action="{% url 'detect:login' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}" />
+        <div class="mb-4">
+            <label for="username" class="block text-gray-700 dark:text-white">Username</label>
+            <input type="text" name="username" id="username" required
+                class="block w-full p-2 mt-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white" />
+        </div>
+        <div class="mb-4">
+            <label for="password" class="block text-gray-700 dark:text-white">Password</label>
+            <input type="password" name="password" id="password" required
+                class="block w-full p-2 mt-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white" />
+        </div>
+        <button type="submit"
+            class="w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring focus:ring-blue-300 hover:cursor-pointer">Masuk</button>
+    </form>
+</div>
+
+{% endblock content %}
