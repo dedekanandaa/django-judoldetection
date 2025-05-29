@@ -3,6 +3,10 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
+# Update progress_view to accept task_id
+def progress_view(request, task_id):
+    return render(request, 'app/progress.html', {'task_id': task_id})
+
 # auth views
 def login_view(request):
     if request.method == 'POST':
@@ -57,11 +61,11 @@ def search_view(request):
         if limit < 1:
             limit = 1
 
-        from . import coba
-        import asyncio
-        result = asyncio.run(coba.main_search(query=query, num_results=limit))
-
-        return redirect('detect:result', id=result)
+        from detectionapp.coba import main_search
+        task = main_search.delay(query=query, num_results=limit)
+        
+        # Redirect to progress page with task_id
+        return redirect('detect:progress', task_id=task.id)
     else:     
         return render(request, 'app/search.html', {"input_type": "Kata Kunci"})
 
@@ -73,11 +77,15 @@ def file_view(request):
             messages.error(request, 'File tidak boleh kosong')
             return redirect('detect:file')
 
-        from . import coba
-        import asyncio
-        result = asyncio.run(coba.image_upload(file=file))
-
-        return redirect('detect:result', id=result)
+        # Save the file first, then pass the path to Celery
+        from detectionapp.coba import prepare_uploaded_image
+        file_path = prepare_uploaded_image(file)
+        
+        # Call Celery task with file path instead of file object
+        from detectionapp.coba import image_upload
+        task = image_upload.delay(file_path)
+        
+        return redirect('detect:progress', task_id=task.id)
     else:
         return render(request, 'app/file.html', {"input_type": "Import Gambar"})
 
@@ -86,11 +94,9 @@ def domain_view(request):
     if request.method == 'POST':
         domain = request.POST.getlist('domain')
 
-        from . import coba
-        import asyncio
-        result = asyncio.run(coba.main_domain(domain=domain))
-
-        return redirect('detect:result', id=result)
+        from detectionapp.coba import main_domain
+        task = main_domain.delay(domain)
+        return redirect('detect:progress', task_id=task.id)
     else: 
         limit = int(request.GET.get('limit', 5))
         if limit < 1:

@@ -17,5 +17,6 @@ Including another URLconf
 from django.urls import path, include
 
 urlpatterns = [
-    path("", include("detectionapp.urls"))
+    path("", include("detectionapp.urls")),
+    path('celery-progress/', include('celery_progress.urls')),
 ]

@@ -1,0 +1,67 @@
+{% extends "index.html" %}
+
+{% block title %}Progress{% endblock title %}
+
+{% block content %}
+<div class="flex flex-col items-center mb-4">
+    <h1 class="text-3xl font-bold text-gray-800 dark:text-white mb-4">Sistem Sedang Bekerja</h1>
+    
+    <div class="w-full max-w-lg bg-gray-200 rounded-full h-4 dark:bg-gray-700 mb-2">
+        <!-- Add id="progress-bar" to match what the library expects -->
+        <div id="progress-bar" class="progress-bar bg-blue-600 h-4 rounded-full" style="width: 0%"></div>
+    </div>
+    
+    <!-- Add id="progress-bar-message" to match what the library expects -->
+    <div id="progress-bar-message" class="progress-text text-gray-600 dark:text-gray-300">0%</div>
+    <div class="progress-description text-gray-600 dark:text-gray-300">Mempersiapkan...</div>
+    
+    <div class="mt-4 hidden success-message text-green-600 dark:text-green-400">
+        <span>Proses selesai! Mengalihkan...</span>
+    </div>
+    
+    <div class="mt-4 hidden error-message text-red-600 dark:text-red-400">
+        <span>Terjadi kesalahan! Silakan coba lagi.</span>
+    </div>
+    
+</div>
+
+{% load static %}
+<script src="{% static 'celery_progress/celery_progress.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const progressBar = document.querySelector('.progress-bar');
+        const progressText = document.querySelector('.progress-text');
+        const progressDescription = document.querySelector('.progress-description');
+        const successMessage = document.querySelector('.success-message');
+        const errorMessage = document.querySelector('.error-message');
+        
+        function onProgressSuccess(a, b, res) {
+            successMessage.classList.remove('hidden');
+            setTimeout(function() {
+                window.location.href = "{% url 'detect:result' 0 %}".replace('0', res);
+            }, 2000);
+        }
+        
+        function onProgressError() {
+            console.log('Error occurred during progress tracking');
+            errorMessage.classList.remove('hidden');
+        }
+        
+        function onProgressUpdate(a, b, res) {
+            progressBar.style.width = res.percent + '%';
+            progressText.innerText = res.percent + '%';
+            
+            if (res.description) {
+                progressDescription.innerText = res.description;
+            }
+        }
+        
+        const progressUrl = "{% url 'celery_progress:task_status' task_id %}";
+        CeleryProgressBar.initProgressBar(progressUrl, {
+            onSuccess: onProgressSuccess,
+            onError: onProgressError,
+            onProgress: onProgressUpdate
+        });
+    });
+</script>
+{% endblock %}

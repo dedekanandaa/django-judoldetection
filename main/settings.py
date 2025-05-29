@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "detectionapp",
+    "celery_progress",
 ]
 
 MIDDLEWARE = [
@@ -131,3 +132,14 @@ LOGOUT_REDIRECT_URL = "/login/"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Add to the bottom of your settings.py
+# Celery settings
+CELERY_IMPORTS = [
+    'detectionapp.coba',
+]
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'

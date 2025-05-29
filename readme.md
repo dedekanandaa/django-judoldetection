@@ -13,9 +13,11 @@ Repositori ini berisi aplikasi skripsi. Ikuti langkah berikut untuk menjalankan 
 - Googlesearch
 - Sastrawi
 - Playwright dengan browser dependencies terinstall
-- asgiref
+- Asgiref
 - [Pytesseract](https://github.com/tesseract-ocr/tesseract/releases/) yang sudah diinstall dan dikonfigurasi beserta [Indonesia trained data](https://github.com/tesseract-ocr/tessdata/blob/main/ind.traineddata)
 - [Pretrained Model](https://drive.google.com/drive/folders/1DIz0MHo4qycmkjISkRbafOTuD4RoabW6?usp=sharing) (dapat diakses menggunakan email **@pnb.ac.id**) 
+- Celery, celery_progress
+- [Redis](https://github.com/tporadowski/redis/releases) 
 
 
 ## Instalasi
@@ -41,6 +43,10 @@ Repositori ini berisi aplikasi skripsi. Ikuti langkah berikut untuk menjalankan 
 
 ```bash
 python manage.py runserver
+```
+
+```bash
+celery -A main worker --loglevel=info -P threads
 ```
 
 Aplikasi akan berjalan di `http://localhost:8000` (atau port yang tertera di terminal).

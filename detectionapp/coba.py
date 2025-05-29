@@ -14,6 +14,8 @@ from pytesseract import pytesseract
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
 from . import models
+from celery import shared_task
+from celery_progress.backend import ProgressRecorder
 
 # Configure pytesseract path
 pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -451,54 +453,188 @@ async def save_model(results, type):
     return history_entry.id  # Return the history entry ID
 
 
-async def image_upload(file):
-    """Function to be called from Django views"""
+def prepare_uploaded_image(file):
+    """Helper function to save an uploaded file and return the path"""
+    from django.core.files.storage import FileSystemStorage
+
+    fs = FileSystemStorage(location='media/images/')
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = fs.save('uploaded_'+timestamp+'.png', file)
+    file_path = fs.path(filename)
+    Image.open(file_path).save(file_path)
+    
+    return file_path
+
+
+@shared_task(bind=True)
+def image_upload(self, file_path):
+    """Celery task to analyze uploaded images with progress tracking"""
+    progress_recorder = ProgressRecorder(self)
+    
+    progress_recorder.set_progress(5, 100, "Loading analysis models...")
+    
+    # Define device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # Load models
     model_path = ASSETS_DIR + 'best_gambling_detector_model.pth'
     word2vec_path = ASSETS_DIR + 'word2vec_model.bin'
     
-    model = await load_model(model_path, device)
-    word2vec_model = await load_word2vec_model(word2vec_path)
+    # Run these synchronously in Celery task
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    # Show progress for each model
+    progress_recorder.set_progress(15, 100, "Loading gambling detection model...")
+    model = loop.run_until_complete(load_model(model_path, device))
+    
+    progress_recorder.set_progress(25, 100, "Loading language model...")
+    word2vec_model = loop.run_until_complete(load_word2vec_model(word2vec_path))
     
     if not model or not word2vec_model:
         return {"error": "Failed to load models. Please check model paths and files."}
     
-    from django.core.files.storage import FileSystemStorage
-
-    fs = FileSystemStorage(location='media/images/')
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = fs.save('uploaded_'+timestamp+'.png', file)
-    file_path = fs.path(filename) 
-    image = Image.open(file_path).save(file_path)
+    progress_recorder.set_progress(35, 100, "Processing image...")
     
     # Perform OCR
     image = Image.open(file_path)
     image = image.convert('L')  # Convert to grayscale
+    
+    progress_recorder.set_progress(50, 100, "Extracting text with OCR...")
     extracted_text = pytesseract.image_to_string(image, lang="ind")
     
+    progress_recorder.set_progress(65, 100, "Analyzing text content...")
+    
     # Pre-process text
-    cleaned_text = re.sub(r'[^\w\s.,]', '', extracted_text).lower()  # Keep only alphanumeric, spaces, periods, commas
+    cleaned_text = re.sub(r'[^\w\s.,]', '', extracted_text).lower()
     cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
     filtered_text = ' '.join([word for word in cleaned_text.split() if word not in sastrawi_stopwords])
-    filtered_text = stemmer.stem(filtered_text)  # Apply stemming
+    filtered_text = stemmer.stem(filtered_text)
+    
+    progress_recorder.set_progress(80, 100, "Making prediction...")
+    
+    # Get filename from path
+    filename = os.path.basename(file_path)
     
     # Make prediction
-    prediction = await predict_single_website(model, word2vec_model, file_path, filtered_text, device)
-    prediction['screenshot_path'] = filename  # Add the screenshot path
-    prediction['extracted_text'] = filtered_text[:500]  # Add a preview of the text
-    prediction['url'] = "image uploaded"  # Add the URL to the prediction result
+    prediction = loop.run_until_complete(predict_single_website(model, word2vec_model, file_path, filtered_text, device))
+    prediction['screenshot_path'] = filename
+    prediction['extracted_text'] = filtered_text[:500]
+    prediction['url'] = "image uploaded"
     
-    return await save_model([prediction], 'upload')  # Save the result to the database and return the history entry ID
+    progress_recorder.set_progress(90, 100, "Saving results...")
+    
+    # Save the result
+    history_id = loop.run_until_complete(save_model([prediction], 'upload'))
+    loop.close()
+    
+    progress_recorder.set_progress(100, 100, "Analysis complete!")
+    return history_id
 
-async def main_domain(domain):
-    results = await analyze_websites(domain=domain)
-    return await save_model(results, 'domain')  # Return the history entry ID
 
-async def main_search(query, num_results): 
-    results = await analyze_websites(query=query, num_results=num_results)
-    return await save_model(results, 'search')  # Return the history entry ID
+
+@shared_task(bind=True)
+def main_domain(self, domain):
+    """Celery task to analyze domain with progress tracking"""
+    progress_recorder = ProgressRecorder(self)
+    
+    # Define device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # Update progress
+    progress_recorder.set_progress(10, 100, "Loading models...")
+    
+    # Load models
+    model_path = ASSETS_DIR + 'best_gambling_detector_model.pth'
+    word2vec_path = ASSETS_DIR + 'word2vec_model.bin'
+    
+    # Run these synchronously in Celery task
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    model = loop.run_until_complete(load_model(model_path, device))
+    word2vec_model = loop.run_until_complete(load_word2vec_model(word2vec_path))
+    
+    if not model or not word2vec_model:
+        return {"error": "Failed to load models. Please check model paths and files."}
+    
+    progress_recorder.set_progress(30, 100, f"Processing domain: {domain}")
+    
+    # If domain is a string, convert it to a list
+    if isinstance(domain, str):
+        domain = [domain]
+    
+    # Process domain
+    results = loop.run_until_complete(analyze_websites(domain=domain))
+    
+    progress_recorder.set_progress(90, 100, "Saving results...")
+    
+    # Save results
+    history_id = loop.run_until_complete(save_model(results, 'domain'))
+    loop.close()
+    
+    progress_recorder.set_progress(100, 100, "Domain analysis complete!")
+    return history_id
+
+
+
+
+@shared_task(bind=True)
+def main_search(self, query, num_results):
+    progress_recorder = ProgressRecorder(self)
+    
+    # Define device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # Load models
+    model_path = ASSETS_DIR + 'best_gambling_detector_model.pth'
+    word2vec_path = ASSETS_DIR + 'word2vec_model.bin'
+    
+    # Update progress
+    progress_recorder.set_progress(0, 100, "Loading models...")
+    
+    # Run these synchronously in Celery task
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    model = loop.run_until_complete(load_model(model_path, device))
+    word2vec_model = loop.run_until_complete(load_word2vec_model(word2vec_path))
+    
+    if not model or not word2vec_model:
+        return {"error": "Failed to load models. Please check model paths and files."}
+    
+    # Get search results
+    progress_recorder.set_progress(10, 100, f"Searching for: {query}")
+    urls = get_search_results(query, num_results)
+    if not urls:
+        return {"error": "No URLs found to analyze"}
+    
+    # Process URLs one by one to show progress
+    results = []
+    total_urls = len(urls)
+    for i, url in enumerate(urls):
+        # Calculate percentage: 20% for model loading + search, 70% for processing URLs
+        percentage = 20 + int((i / total_urls) * 70)
+        progress_recorder.set_progress(percentage, 100, f"Processing {url}")
+        
+        # Process this URL
+        result = loop.run_until_complete(process_url(url, model, word2vec_model, device))
+        results.append(result)
+    
+    # Save results
+    progress_recorder.set_progress(90, 100, "Saving results...")
+    history_id = loop.run_until_complete(save_model(results, 'search'))
+    loop.close()
+    
+    # Complete
+    progress_recorder.set_progress(100, 100, "Processing complete!")
+
+    # Return the history_id which will be passed to onProgressSuccess in progress.html
+    return history_id
+
 
 # For standalone testing
 if __name__ == "__main__":

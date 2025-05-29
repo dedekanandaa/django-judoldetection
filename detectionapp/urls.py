@@ -14,4 +14,5 @@ urlpatterns = [
     path("file/", view=views.file_view, name="file"),
     path("domain/", view=views.domain_view, name="domain"),
     path("history/", view=views.history_view, name="history"),
+    path("progress/<str:task_id>", view=views.progress_view, name="progress"),
 ]
