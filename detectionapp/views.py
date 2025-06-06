@@ -114,8 +114,8 @@ def history_view(request):
     for item in items:
         item['result'] = result.objects.filter(history_id=item['id']).values()
         item['count'] = len(item['result'])
-        item['judi'] = len([x for x in item['result'] if x['predict'] == 2])
-        item['non_judi'] = len([x for x in item['result'] if x['predict'] == 3])
+        item['judi'] = len([x for x in item['result'] if x['predict'] == 1])
+        item['non_judi'] = len([x for x in item['result'] if x['predict'] == 0])
         if item['count'] > 0:
             item['result'] = item['result'][0]
         else:

@@ -6,7 +6,8 @@ import torch.nn as nn
 from torchvision import transforms
 from gensim.models import Word2Vec
 from datetime import datetime
-from PIL import Image
+from PIL import Image, ImageEnhance
+import string
 import re
 from googlesearch import search
 from playwright.async_api import async_playwright, Error
@@ -149,6 +150,17 @@ class LateFusionModel(nn.Module):
             nn.Sigmoid()
         )
 
+        # Initialize weights properly
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        # Initialize fusion layer with bias toward combined prediction
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+
     def forward(self, image, text, text_lengths):
         # Extract features
         visual_features = self.visual_extractor(image)
@@ -181,15 +193,30 @@ async def load_model(model_path, device):
     try:
         checkpoint = torch.load(model_path, map_location=device)
         
+        # Define default model parameters matching training constants
+        WORD_EMBEDDING_DIM = 100
+        LSTM_HIDDEN_DIM = 128
+        MLP_HIDDEN_DIM = 128
+        
         # Check if it's the production model package or training checkpoint
         if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
             # It's a training checkpoint
-            params = torch.load(os.path.join(ASSETS_DIR, 'model_params.pth'))
-            model = LateFusionModel(
-                word_embedding_dim=params['word_embedding_dim'],
-                lstm_hidden_dim=params['lstm_hidden_dim'],
-                mlp_hidden_dim=params['mlp_hidden_dim']
-            ).to(device)
+            try:
+                params = torch.load(os.path.join(ASSETS_DIR, 'model_params.pth'))
+                model = LateFusionModel(
+                    word_embedding_dim=params.get('word_embedding_dim', WORD_EMBEDDING_DIM),
+                    lstm_hidden_dim=params.get('lstm_hidden_dim', LSTM_HIDDEN_DIM),
+                    mlp_hidden_dim=params.get('mlp_hidden_dim', MLP_HIDDEN_DIM)
+                ).to(device)
+            except FileNotFoundError:
+                # Fallback to default parameters if params file not found
+                print("Model parameters file not found, using default values")
+                model = LateFusionModel(
+                    word_embedding_dim=WORD_EMBEDDING_DIM,
+                    lstm_hidden_dim=LSTM_HIDDEN_DIM,
+                    mlp_hidden_dim=MLP_HIDDEN_DIM
+                ).to(device)
+            
             model.load_state_dict(checkpoint['model_state_dict'])
         elif isinstance(checkpoint, dict) and 'model' in checkpoint:
             # It's a production model package
@@ -223,7 +250,6 @@ async def predict_single_website(model, word2vec_model, img_path, text, device='
     try:
         # Add debugging 
         print(f"Starting prediction for image: {img_path}")
-        print(f"Text excerpt: {text[:50]}..." if text else "No text extracted")
         
         # Load and transform image
         img_transform = transforms.Compose([
@@ -243,7 +269,6 @@ async def predict_single_website(model, word2vec_model, img_path, text, device='
         print(f"Processing {len(words)} words through Word2Vec")
         
         # Track how many words were found in the model
-        words_found = 0
         for word in words:
             if word in word2vec_model.wv:
                 word_vectors.append(word2vec_model.wv[word])
@@ -274,12 +299,16 @@ async def predict_single_website(model, word2vec_model, img_path, text, device='
         is_gambling = final_prob > 0.5
         is_gambling = True if is_gambling else False
         
-        # Determine which component had the strongest influence
-        max_component = max([
-            (1, visual_prob), # Visual
-            (2, semantic_prob), # Semantic
-            (3, combined_prob) # Combined
-        ], key=lambda x: x[1]) # Get the component with the highest probability
+        components = [
+            ('visual', visual_prob),
+            ('semantic', semantic_prob),
+            ('combined', combined_prob)
+        ]
+
+        if is_gambling:
+            max_component = max(components, key=lambda x: x[1])  # Get highest probability component
+        else:
+            max_component = min(components, key=lambda x: x[1])  # Get lowest probability component
         
         return {
             'prediction': is_gambling,
@@ -301,6 +330,9 @@ def get_search_results(query: str, num_results: int = 5) -> list:
     results = []
     try:
         for url in search(query, num_results=num_results):
+            if url.startswith('/'):
+                # Skip relative URLs
+                continue
             results.append(url)
     except Exception as e:
         print(f"Error during Google search: {e}")
@@ -346,6 +378,7 @@ async def take_screenshot(url: str, output_dir: str = OUTPUT_DIR) -> str:
             await page.goto(url, timeout=30000, wait_until="domcontentloaded")
             
             # Take screenshot
+            await page.wait_for_timeout(1000)
             print(f"Taking screenshot...")
             await page.screenshot(path=filepath)
             print(f"Screenshot saved to: {filepath}")
@@ -354,7 +387,7 @@ async def take_screenshot(url: str, output_dir: str = OUTPUT_DIR) -> str:
             
         except Error as e:
             print(f"Error accessing {url}: {e}")
-            return None
+            return None, e
         finally:
             await browser.close()
 
@@ -364,24 +397,23 @@ async def process_url(url, model, word2vec_model, device):
     try:
         # Take screenshot
         screenshot_path, filename = await take_screenshot(url)
-        if not screenshot_path:
-            return {"error": f"Failed to take screenshot of {url}"}
+        if screenshot_path is None:
+            return {"error": filename}
         
         # Perform OCR
         image = Image.open(screenshot_path)
         image = image.convert('L')  # Convert to grayscale
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(2)
         extracted_text = pytesseract.image_to_string(image, lang="ind")
         
         # Pre-process text
-        cleaned_text = re.sub(r'[^\w\s.,]', '', extracted_text).lower()  # Keep only alphanumeric, spaces, periods, commas
-        cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
-        filtered_text = ' '.join([word for word in cleaned_text.split() if word not in sastrawi_stopwords])
-        filtered_text = stemmer.stem(filtered_text)  # Apply stemming
-        
+        filtered_text = preprocess_text(extracted_text)
+
         # Make prediction
         prediction = await predict_single_website(model, word2vec_model, screenshot_path, filtered_text, device)
         prediction['screenshot_path'] = filename  # Add the screenshot path
-        prediction['extracted_text'] = filtered_text[:500]  # Add a preview of the text
+        prediction['extracted_text'] = filtered_text  # Add a preview of the text
         prediction['url'] = url  # Add the URL to the prediction result
         
         return prediction
@@ -465,6 +497,34 @@ def prepare_uploaded_image(file):
     
     return file_path
 
+def preprocess_text(text):
+    """Comprehensive text preprocessing for gambling detection"""
+    try:
+        text = text.lower()
+    except (TypeError, AttributeError):
+        text = str(text).lower()
+
+    # Remove non-ASCII characters
+    text = re.sub(r'[^\x00-\x7F]+', ' ', text)
+    
+    # Remove punctuation but preserve spaces
+    text = text.translate(str.maketrans(string.punctuation, ' ' * len(string.punctuation)))
+    
+    # Normalize whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # Remove stopwords
+    words = text.split()
+    filtered_words = [word for word in words if word not in sastrawi_stopwords and len(word) > 2]
+
+    # Remove words with numbers
+    filtered_words = [word for word in filtered_words if not any(char.isdigit() for char in word)]
+    
+    # Apply stemming
+    stemmed_words = [stemmer.stem(word) for word in filtered_words]
+
+    # Join words with space for easier tokenization later
+    return " ".join(stemmed_words)
 
 @shared_task(bind=True)
 def image_upload(self, file_path):
@@ -499,7 +559,9 @@ def image_upload(self, file_path):
     
     # Perform OCR
     image = Image.open(file_path)
-    image = image.convert('L')  # Convert to grayscale
+    image = image.convert('L')
+    enhancer = ImageEnhance.Contrast(image)
+    image = enhancer.enhance(2) 
     
     progress_recorder.set_progress(50, 100, "Extracting text with OCR...")
     extracted_text = pytesseract.image_to_string(image, lang="ind")
@@ -507,10 +569,7 @@ def image_upload(self, file_path):
     progress_recorder.set_progress(65, 100, "Analyzing text content...")
     
     # Pre-process text
-    cleaned_text = re.sub(r'[^\w\s.,]', '', extracted_text).lower()
-    cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
-    filtered_text = ' '.join([word for word in cleaned_text.split() if word not in sastrawi_stopwords])
-    filtered_text = stemmer.stem(filtered_text)
+    filtered_text = preprocess_text(extracted_text)
     
     progress_recorder.set_progress(80, 100, "Making prediction...")
     
@@ -520,7 +579,7 @@ def image_upload(self, file_path):
     # Make prediction
     prediction = loop.run_until_complete(predict_single_website(model, word2vec_model, file_path, filtered_text, device))
     prediction['screenshot_path'] = filename
-    prediction['extracted_text'] = filtered_text[:500]
+    prediction['extracted_text'] = filtered_text
     prediction['url'] = "image uploaded"
     
     progress_recorder.set_progress(90, 100, "Saving results...")

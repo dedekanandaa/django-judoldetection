@@ -6,15 +6,10 @@ class history(models.Model):
     type = models.CharField(max_length=15)
 
 class result(models.Model):
-    class FactorChoice(models.IntegerChoices):
-        semantic = 1, 'semantic'
-        visual = 2, 'visual'
-        combined = 3, 'combined'
-    
     id = models.AutoField(primary_key=True)
     img = models.TextField(blank=True, null=True)
     text = models.TextField(blank=True, null=True)
-    primary_factor = models.IntegerField(choices=FactorChoice, blank=True, null=True)
+    primary_factor = models.TextField(blank=True, null=True)
     visual_feature = models.FloatField(blank=True, null=True)
     semantic_feature = models.FloatField(blank=True, null=True)
     combined_feature = models.FloatField(blank=True, null=True)
@@ -26,9 +21,24 @@ class result(models.Model):
         on_delete=models.CASCADE,
         related_name="results"
     )
+    
+    @property
+    def visual_confidence(self):
+        """Calculate visual confidence based on dynamic prediction"""
+        return abs(self.visual_feature - 0.5) * 200
 
     @property
-    def primary_factor_label(self):
-        return self.get_primary_factor_display()
+    def semantic_confidence(self):
+        """Calculate semantic confidence based on dynamic prediction"""
+        return abs(self.semantic_feature - 0.5) * 200
 
-    
+    @property
+    def combined_confidence(self):
+        """Calculate combined confidence based on dynamic prediction"""
+        return abs(self.combined_feature - 0.5) * 200
+
+    @property
+    def confidence_percent(self):
+        """Calculate combined confidence based on dynamic prediction"""
+        return abs(self.confidence - 0.5) * 200
+
