@@ -6,58 +6,140 @@
 
 <section class="bg-white dark:bg-gray-900">
     <div class="px-4 mx-auto max-w-screen-xl text-center">
-        <h1 class="mb-4 font-extrabold tracking-tight leading-none text-gray-900 text-xl dark:text-white">
-            Riwayat Pengecekan
-        </h1>
-<div class="relative overflow-x-auto">
-    <table class="w-full text-sm text-left rounded-xl overflow-hidden rtl:text-right text-gray-500 dark:text-gray-400">
-        <thead class="text-xs text-gray-700 uppercase bg-gray-200 dark:bg-gray-700 dark:text-gray-400">
-            <tr>
-                <th scope="col" class="px-6 py-3">
-                    Tanggal/Waktu
-                </th>
-                <th scope="col" class="px-6 py-3">
-                    Tipe
-                </th>
-                <th scope="col" class="px-6 py-3">
-                    Kesimpulan
-                </th>
-                <th scope="col" class="px-6 py-3">
-                    Aksi
-                </th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in data  %}
-            <tr class="bg-gray-100 border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200">
-                <th scope="row" class="px-6 py-4 font-normal text-gray-900 dark:text-white">
-                    {{ item.date|date:" H:m:s" }}
-                    <br>
-                    {{ item.date|date:"d M Y" }}
-                </th>
-                <td class="px-6 py-4">
-                    {{ item.type }}
-                </td>
-                <td class="px-6 py-4">
-                    Total : {{ item.count }}
-                    <br>
-                    Judi : {{ item.judi }}
-                    <br>
-                    Non Judi : {{ item.non_judi }}
-                </td>
-                <td class="px-6 py-4">
-                    <a href="{% url 'detect:result' item.id %}" class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-blue-900 dark:text-blue-300">
-                        Detail
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+        <!-- Pie Chart Section -->
+        <div class="flex flex-col md:flex-row justify-center items-center gap-8 my-8">
+            <div class="w-full md:w-1/2 flex flex-col items-center">
+                <h2 class="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">Hasil Pendeteksian</h2>
+                <canvas id="pieChartHasil" width="250" height="250"></canvas>
+            </div>
+            <div class="w-full md:w-1/2 flex flex-col items-center">
+                <h2 class="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">Metode yang Digunakan</h2>
+                <canvas id="pieChartMetode" width="250" height="250"></canvas>
+            </div>
+        </div>
 
+        <div class="flex justify-between">
+            <h1 class="mb-4 font-extrabold tracking-tight leading-none text-gray-900 text-xl dark:text-white">
+                Riwayat Pengecekan
+            </h1>
+            <nav class="inline-flex rounded-md shadow-sm" aria-label="Pagination">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}"
+                    class="relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700">
+                        &laquo;
+                    </a>
+                {% else %}
+                    <span class="relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-gray-100 text-sm font-medium text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500 dark:border-gray-600">
+                        &laquo;
+                    </span>
+                {% endif %}
+    
+                <span class="relative inline-flex items-center px-4 py-2 border-t border-b border-gray-300 bg-white text-sm font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600">
+                    {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }}
+                </span>
+    
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}"
+                    class="relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700">
+                        &raquo;
+                    </a>
+                {% else %}
+                    <span class="relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-gray-100 text-sm font-medium text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500 dark:border-gray-600">
+                        &raquo;
+                    </span>
+                {% endif %}
+            </nav>
+        </div>
+        <div class="mt-6 relative overflow-x-auto">
+            <table class="w-full text-sm text-left rounded-xl overflow-hidden rtl:text-right text-gray-500 dark:text-gray-400">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-200 dark:bg-gray-700 dark:text-gray-400">
+                    <tr>
+                        <th scope="col" class="px-6 py-3">
+                            Tanggal/Waktu
+                        </th>
+                        <th scope="col" class="px-6 py-3">
+                            Tipe
+                        </th>
+                        <th scope="col" class="px-6 py-3">
+                            Kesimpulan
+                        </th>
+                        <th scope="col" class="px-6 py-3">
+                            Aksi
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in page_obj  %}
+                    <tr class="bg-gray-100 border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200">
+                        <th scope="row" class="px-6 py-4 font-normal text-gray-900 dark:text-white">
+                            {{ item.date|date:" H:m:s" }}
+                            <br>
+                            {{ item.date|date:"d M Y" }}
+                        </th>
+                        <td class="px-6 py-4">
+                            {{ item.type }}
+                        </td>
+                        <td class="px-6 py-4">
+                            Total : {{ item.count }}
+                            <br>
+                            Judi : {{ item.judi }}
+                            <br>
+                            Non Judi : {{ item.non_judi }}
+                        </td>
+                        <td class="px-6 py-4">
+                            <a href="{% url 'detect:result' item.id %}" class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-blue-900 dark:text-blue-300">
+                                Detail
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </section>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Data dari backend
+    const hasilData = {
+        labels: ['Judi', 'Non Judi'],
+        datasets: [{
+            data: [{{ hasil_data.judi }}, {{ hasil_data.non_judi }}],
+            backgroundColor: ['#f87171', '#60a5fa'],
+            borderWidth: 1
+        }]
+    };
 
+    const metodeData = {
+        labels: ['Search', 'Domain', 'Upload'],
+        datasets: [{
+            data: [{{ metode_data.search }}, {{ metode_data.domain }}, {{ metode_data.upload }}],
+            backgroundColor: ['#34d399', '#fbbf24',  '#818cf8'],
+            borderWidth: 1
+        }]
+    };
+
+    new Chart(document.getElementById('pieChartHasil'), {
+        type: 'pie',
+        data: hasilData,
+        options: {
+            responsive: false,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+
+    new Chart(document.getElementById('pieChartMetode'), {
+        type: 'pie',
+        data: metodeData,
+        options: {
+            responsive: false,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+</script>
 {% endblock content %}

@@ -398,7 +398,7 @@ async def process_url(url, model, word2vec_model, device):
         # Take screenshot
         screenshot_path, filename = await take_screenshot(url)
         if screenshot_path is None:
-            return {"error": filename}
+            raise Exception(filename)
         
         # Perform OCR
         image = Image.open(screenshot_path)

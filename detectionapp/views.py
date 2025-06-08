@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.paginator import Paginator
 
 # Update progress_view to accept task_id
 def progress_view(request, task_id):
@@ -108,20 +109,25 @@ def domain_view(request):
 # result views
 @login_required
 def history_view(request):
-    from .models import history, result
-    items = history.objects.all().order_by('-date').values()
-    
-    for item in items:
-        item['result'] = result.objects.filter(history_id=item['id']).values()
-        item['count'] = len(item['result'])
-        item['judi'] = len([x for x in item['result'] if x['predict'] == 1])
-        item['non_judi'] = len([x for x in item['result'] if x['predict'] == 0])
-        if item['count'] > 0:
-            item['result'] = item['result'][0]
-        else:
-            item['result'] = None
+    from .models import history
+    items = history.objects.all().order_by('-date')
+    paginator = Paginator(items, 5)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
 
-    return render(request, 'app/history.html', {"data" : items})
+    # Ambil data chart
+    hasil_data = history.chart_hasil_data()
+    metode_data = history.chart_metode_data()
+
+    return render(
+        request,
+        'app/history.html',
+        {
+            "page_obj": page_obj,
+            "hasil_data": hasil_data,
+            "metode_data": metode_data,
+        }
+    )
 
 @login_required
 def result_view(request, id):
