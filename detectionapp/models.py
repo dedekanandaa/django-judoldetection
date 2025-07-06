@@ -36,11 +36,9 @@ class result(models.Model):
     id = models.AutoField(primary_key=True)
     img = models.TextField(blank=True, null=True)
     text = models.TextField(blank=True, null=True)
-    primary_factor = models.TextField(blank=True, null=True)
     visual_feature = models.FloatField(blank=True, null=True)
     semantic_feature = models.FloatField(blank=True, null=True)
     combined_feature = models.FloatField(blank=True, null=True)
-    confidence = models.FloatField(blank=True, null=True)
     predict = models.BooleanField(blank=True, null=True)
     url = models.TextField(blank=True, null=True)
     history_id = models.ForeignKey(
@@ -63,9 +61,3 @@ class result(models.Model):
     def combined_confidence(self):
         """Calculate combined confidence based on dynamic prediction"""
         return abs(self.combined_feature - 0.5) * 200
-
-    @property
-    def confidence_percent(self):
-        """Calculate combined confidence based on dynamic prediction"""
-        return abs(self.confidence - 0.5) * 200
-

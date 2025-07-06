@@ -32,7 +32,12 @@ def home_view(request):
     return render(request, 'page/home.html')
 
 def about_view(request):
-    return render(request, 'page/about.html')
+    from .models import history
+    # Ambil data chart
+    hasil_data = history.chart_hasil_data()
+    metode_data = history.chart_metode_data()
+
+    return render(request, 'page/about.html', {"hasil_data": hasil_data, "metode_data": metode_data,})
 
 @login_required
 def logout_view(request):
@@ -57,8 +62,8 @@ def search_view(request):
         if len(query) > 100:
             messages.error(request, 'Kata kunci terlalu panjang')
             return redirect('detect:search')
-        if limit > 20:
-            limit = 20
+        if limit > 30:
+            limit = 30
         if limit < 1:
             limit = 1
 
@@ -102,7 +107,7 @@ def domain_view(request):
         limit = int(request.GET.get('limit', 5))
         if limit < 1:
             limit = 1
-        elif limit >= 20:
+        elif limit > 10:
             limit = 10
         return render(request, 'app/domain.html', {"input_type": "Domain", "limit" : range(1, limit+1), "lim": limit})
 
@@ -111,21 +116,16 @@ def domain_view(request):
 def history_view(request):
     from .models import history
     items = history.objects.all().order_by('-date')
-    paginator = Paginator(items, 5)
+    paginator = Paginator(items, 6)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # Ambil data chart
-    hasil_data = history.chart_hasil_data()
-    metode_data = history.chart_metode_data()
 
     return render(
         request,
         'app/history.html',
         {
             "page_obj": page_obj,
-            "hasil_data": hasil_data,
-            "metode_data": metode_data,
         }
     )
 

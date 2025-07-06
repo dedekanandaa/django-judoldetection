@@ -6,19 +6,7 @@
 
 <section class="bg-white dark:bg-gray-900">
     <div class="px-4 mx-auto max-w-screen-xl text-center">
-        <!-- Pie Chart Section -->
-        <div class="flex flex-col md:flex-row justify-center items-center gap-8 my-8">
-            <div class="w-full md:w-1/2 flex flex-col items-center">
-                <h2 class="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">Hasil Pendeteksian</h2>
-                <canvas id="pieChartHasil" width="250" height="250"></canvas>
-            </div>
-            <div class="w-full md:w-1/2 flex flex-col items-center">
-                <h2 class="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">Metode yang Digunakan</h2>
-                <canvas id="pieChartMetode" width="250" height="250"></canvas>
-            </div>
-        </div>
-
-        <div class="flex justify-between">
+        <div class="flex justify-between items-center">
             <h1 class="mb-4 font-extrabold tracking-tight leading-none text-gray-900 text-xl dark:text-white">
                 Riwayat Pengecekan
             </h1>
@@ -70,7 +58,7 @@
                 </thead>
                 <tbody>
                     {% for item in page_obj  %}
-                    <tr class="bg-gray-100 border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200">
+                    <tr class="bg-gray-100 border-t dark:bg-gray-800 dark:border-gray-700 border-gray-200">
                         <th scope="row" class="px-6 py-4 font-normal text-gray-900 dark:text-white">
                             {{ item.date|date:" H:m:s" }}
                             <br>
@@ -99,47 +87,5 @@
     </div>
 </section>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    // Data dari backend
-    const hasilData = {
-        labels: ['Judi', 'Non Judi'],
-        datasets: [{
-            data: [{{ hasil_data.judi }}, {{ hasil_data.non_judi }}],
-            backgroundColor: ['#f87171', '#60a5fa'],
-            borderWidth: 1
-        }]
-    };
 
-    const metodeData = {
-        labels: ['Search', 'Domain', 'Upload'],
-        datasets: [{
-            data: [{{ metode_data.search }}, {{ metode_data.domain }}, {{ metode_data.upload }}],
-            backgroundColor: ['#34d399', '#fbbf24',  '#818cf8'],
-            borderWidth: 1
-        }]
-    };
-
-    new Chart(document.getElementById('pieChartHasil'), {
-        type: 'pie',
-        data: hasilData,
-        options: {
-            responsive: false,
-            plugins: {
-                legend: { position: 'bottom' }
-            }
-        }
-    });
-
-    new Chart(document.getElementById('pieChartMetode'), {
-        type: 'pie',
-        data: metodeData,
-        options: {
-            responsive: false,
-            plugins: {
-                legend: { position: 'bottom' }
-            }
-        }
-    });
-</script>
 {% endblock content %}

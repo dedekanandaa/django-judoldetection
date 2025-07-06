@@ -5,14 +5,27 @@
 {% block content %}
 
 <section class="bg-white dark:bg-gray-900">
-    <div class="px-4 mx-auto max-w-screen-xl text-center">
-        <h1 class="mb-4 font-extrabold tracking-tight leading-none text-gray-900 text-xl dark:text-white">
-            Hasil
-        </h1>
-        <div class="relative overflow-x-auto">
+    <div class="px-4 mx-auto max-w-screen-xl">
+        <div class="flex gap-3 items-center">
+            <div>
+                <a href="/history" class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-gray-700 rounded-lg hover:bg-gray-800 focus:ring-4 focus:outline-none focus:ring-gray-300 dark:bg-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-800">
+                <svg class="w-3.5 h-3.5 me-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5H1m0 0 4 4M1 5l4-4"/>
+                </svg>
+                Kembali
+                </a>
+            </div>
+            <h1 class="font-extrabold tracking-tight leading-none text-gray-900 text-xl dark:text-white">
+                Hasil
+            </h1>
+        </div>
+        <div class="mt-6 relative overflow-x-auto">
             <table class="w-full text-sm text-left rounded-lg overflow-hidden rtl:text-right text-gray-500 dark:text-gray-400">
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                     <tr>
+                        <th scope="col" class="px-6 py-3">
+                            No
+                        </th>
                         <th scope="col" class="px-6 py-3">
                             Gambar
                         </th>
@@ -21,9 +34,6 @@
                         </th>
                         <th scope="col" class="px-6 py-3">
                             Hasil Prediksi
-                        </th>
-                        <th scope="col" class="px-6 py-3 text-center">
-                            Persentase Keyakinan
                         </th>
                         <th scope="col" class="px-6 py-3">
                             Prediksi
@@ -34,11 +44,13 @@
                     {% load static %}
                     {% for item in data %}
                     <tr class="dark:bg-gray-800 dark:border-gray-700 border-gray-200">
+                        <th></th>
                         <th class="px-6 py-4" colspan="5">
                             URL : <a target="_blank" href="{{ item.url }}">{{ item.url }}</a>
                         </th>
                     </tr>
                     <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200">
+                        <th class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{{ forloop.counter }}</th>
                         {% if item.img == None %}
                         <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
                             <svg class="size-8 mx-auto" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><!-- Icon from Material Symbols by Google - https://github.com/google/material-design-icons/blob/master/LICENSE --><path fill="currentColor" d="M21 18.15L5.85 3H19q.825 0 1.413.588T21 5zm-1.2 4.45L18.2 21H5q-.825 0-1.412-.587T3 19V5.8L1.4 4.2l1.4-1.4l18.4 18.4zM6 17h8.175l-2.1-2.1l-.825 1.1L9 13z"/></svg>
@@ -56,26 +68,30 @@
                             {{ item.text }}
                         </td>
                         <td class="px-6 py-4 text-nowrap">
-                            Faktor Utama :
-                            <span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-blue-900 dark:text-blue-300">
-                                {{ item.primary_factor }}
-                            </span><br>
-                            Visual: {{ item.visual_confidence|floatformat:1 }}% {% if item.visual_feature > 0.5 %}Judi{% else %}Normal{% endif %}<br>
-                            Teks: {{ item.semantic_confidence|floatformat:1 }}% {% if item.semantic_feature > 0.5 %}Judi{% else %}Normal{% endif %}<br>
-                            Gabungan: {{ item.combined_confidence|floatformat:1 }}% {% if item.combined_feature > 0.5 %}Judi{% else %}Normal{% endif %}<br>
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            {{ item.confidence_percent|floatformat:1 }}%<br>
+                            Teks: <br> 
+                            {% if item.semantic_feature > 0.5 %}
+                            {% include 'components/badge.html' with badge_color='red' badge_text='% Judi' badge_number=item.semantic_confidence|floatformat:1 %}
+                            {% else %}
+                            {% include 'components/badge.html' with badge_color='blue' badge_text='% Non Judi' badge_number=item.semantic_confidence|floatformat:1 %}
+                            {% endif %}<br>
+                            Visual: <br> 
+                            {% if item.visual_feature > 0.5 %}
+                            {% include 'components/badge.html' with badge_color='red' badge_text='% Judi' badge_number=item.visual_confidence|floatformat:1 %}
+                            {% else %}
+                            {% include 'components/badge.html' with badge_color='blue' badge_text='% Non Judi' badge_number=item.visual_confidence|floatformat:1 %}
+                            {% endif %}<br>
+                            Gabungan: <br> 
+                            {% if item.combined_feature > 0.5 %}
+                            {% include 'components/badge.html' with badge_color='red' badge_text='% Judi' badge_number=item.combined_confidence|floatformat:1 %}
+                            {% else %}
+                            {% include 'components/badge.html' with badge_color='blue' badge_text='% Non Judi' badge_number=item.combined_confidence|floatformat:1 %}
+                            {% endif %}<br>
                         </td>
                         <td class="px-6 py-4">
                             {% if item.predict %}
-                            <span class="bg-red-100 text-red-800 text-nowrap text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-red-900 dark:text-red-300">
-                                Judi
-                            </span>
+                            {% include 'components/badge.html' with badge_color='red' badge_text='Judi' %}
                             {% else %}
-                            <span class="bg-green-100 text-green-800 text-nowrap text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-green-900 dark:text-green-300">
-                                Non Judi
-                            </span>
+                            {% include 'components/badge.html' with badge_color='green' badge_text='Non Judi' %}
                             {% endif %}
                         </td>
                         {% endif %}
